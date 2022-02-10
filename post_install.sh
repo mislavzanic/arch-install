@@ -38,7 +38,7 @@ EOF
 install_packages() {
     mkdir .config && mkdir .local
     [ $(pacman -Q | grep paru | wc -l) -gt '0' ] || get_aur_helper
-    curl -fLO "https://raw.githubusercontent.com/mislavzanic/dotfiles/master/.local/bin/scripts/install/packages.yaml"
+    [ -f "packages.yaml" ] || curl -fLO "https://raw.githubusercontent.com/mislavzanic/arch_install/master/packages.yaml"
     dwd_packages "pacman"
     dwd_packages "aur"
     config_dots
