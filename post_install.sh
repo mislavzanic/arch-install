@@ -36,12 +36,17 @@ EOF
 }
 
 install_packages() {
-    mkdir .config && mkdir .local
     [ $(pacman -Q | grep paru | wc -l) -gt '0' ] || get_aur_helper
-    [ -f "packages.yaml" ] || curl -fLO "https://raw.githubusercontent.com/mislavzanic/arch_install/master/packages.yaml"
-    dwd_packages "pacman"
-    dwd_packages "aur"
+    dwd_packages "packages.pacman"
+    dwd_packages "packages.aur"
     config_dots
+}
+
+create_dirs() {
+    dirs=($(yq ".dirs[]" | sed 's/\"//g' | tr '\n' ' '))
+    for dir in "${dirs[@]}"; do
+        mkdir -p $dir
+    done
 }
 
 cronjobs() {
@@ -51,6 +56,8 @@ cronjobs() {
 }
 
 main() {
+    [ -f "config.yaml" ] || curl -fLO "https://raw.githubusercontent.com/mislavzanic/arch_install/master/config.yaml"
+    create_dirs
     install_packages $1
     chsh -s $(which zsh)
     cronjobs
