@@ -1,24 +1,34 @@
 #!/bin/sh
 
+AUR_HELPER=''
+
+parse_yaml() {
+    result=($(yq "$1" "$2" | sed 's/\"//g' | tr '\n' ' '))
+    echo "${result[@]}"
+}
+
 get_aur_helper() {
-    git clone https://aur.archlinux.org/paru.git
-    cd paru
-    sudo makepkg -si
-    cd .. && rm -rf paru
+    AUR_HELPER=$(parse_yaml '.aur_helper' 'config.yaml')[0]
+    [ $(pacman -Q | grep $AUR_HELPER | wc -l) -gt '0' ] || {
+        git clone https://aur.archlinux.org/$AUR_HELPER.git
+        cd $AUR_HELPER
+        sudo makepkg -si
+        cd .. && rm -rf $AUR_HELPER
+    }
 }
 
 
 dwd_packages() {
     packages=$(yq ".$1[]" packages.yaml | sed 's/\"//g' | tr '\n' ' ')
-    [ "$1" -eq "pacman" ] && sudo pacman -S $packages || paru -S $packages
+    [ "$1" -eq "pacman" ] && sudo pacman -S $packages || $AUR_HELPER -S $packages
 }
 
 config_dots() {
-    git clone --recurse-submodules https://github.com/mislavzanic/dotfiles.git $HOME/dotfiles
+    dot_repo=$(parse_yaml '.dotfiles[]' 'config.yaml')[0]
+    git clone --recurse-submodules "$dot_repo" $HOME/dotfiles
     chmod a+x $HOME/dotfiles/install.sh
     $HOME/dotfiles/install.sh
     rm -rf ~/dotfiles
-    git clone https://github.com/mislavzanic/scripts.git $HOME/.local/bin/scripts
 }
 
 setup_touchpad() {
@@ -36,7 +46,6 @@ EOF
 }
 
 install_packages() {
-    [ $(pacman -Q | grep paru | wc -l) -gt '0' ] || get_aur_helper
     dwd_packages "packages.pacman"
     dwd_packages "packages.aur"
     config_dots
@@ -57,8 +66,9 @@ cronjobs() {
 
 main() {
     [ -f "config.yaml" ] || curl -fLO "https://raw.githubusercontent.com/mislavzanic/arch_install/master/config.yaml"
+    get_aur_helper
     create_dirs
-    install_packages $1
+    install_packages "$1"
     chsh -s $(which zsh)
     cronjobs
     # nvim --headless +PlugInstall +qall

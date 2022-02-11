@@ -1,3 +1,10 @@
+aur_helper: paru
+
+wm: xmonad
+
+dotfiles:
+  - https://github.com/mislavzanic/dotfiles.git
+
 dirs:
   - .config
   - .local/bin
