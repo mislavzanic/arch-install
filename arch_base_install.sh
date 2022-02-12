@@ -76,7 +76,7 @@ install_grub() {
 
 
 configure_user() {
-    USER=$(parse_yaml '.users | keys' 'config.yaml')
+    USER=$(parse_yaml '.users | keys[]' 'config.yaml')
     groups=$(parse_yaml ".users.$USER[]" 'config.yaml' | tr ' ' ',')
     $CMD useradd -m $USER
     echo 'Enter user password...  '
