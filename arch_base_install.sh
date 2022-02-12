@@ -34,10 +34,9 @@ create_partitions() {
     DISK=$(parse_yaml '.disk' 'config.yaml')
     sgdisk -Z ${DISK}
     sgdisk -a 2048 -o ${DISK}
-
-    sgdisk -n 1::+550M --typecode=2:ef00 --change-name=2:'EFI' ${DISK}
+    sgdisk -n 1::+550MiB --typecode=0:ea00 --change-name=0:'EFI' ${DISK}
     sgdisk -n 2::+2GiB --typecode=0:8200 --change-name=0:'SWAP' ${DISK}
-    sgdisk -n 3::-0 --typecode=3:8300 --change-name=3:'ROOT' ${DISK}
+    sgdisk -n 3::-0 --typecode=0:8300 --change-name=0:'ROOT' ${DISK}
 }
 
 format_disk() {
