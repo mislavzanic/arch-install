@@ -30,17 +30,7 @@ check_net() {
     [ $? -gt "0" ] && echo 'No net.. Please check your network connection.. Aborting..' && exit;
 }
 
-get_device() {
-    lsblk
-    PS3='Choose device for installation:'
-    select DISK in $(lsblk -dpnoNAME); do
-        break
-    done
-    [ -z $DISK ] && DISK='/dev/sda'
-}
-
 create_partitions() {
-    get_device
     DISK=$(parse_yaml '.disk' 'config.yaml')
     sgdisk -Z ${DISK}
     sgdisk -a 2048 -o ${DISK}
@@ -65,7 +55,7 @@ format_disk() {
 install_base() {
     cmd=''
     packages=$(parse_yaml '.packages.base[]' 'config.yaml')
-    [ $os == 'arch' ] && cmd='pacstrap /mnt' || {
+    [ $OS == 'arch' ] && cmd='pacstrap /mnt' || {
         cmd='basestrap /mnt'
         initsys=$(parse_yaml '.init_system' 'config.yaml')
         packages="$packages $initsys elogind-$initsys"
@@ -133,7 +123,7 @@ main() {
     check_efi
     check_net
     pacman -S yq
-    OS=$(parse_yaml 'os' 'config.yaml')
+    OS=$(parse_yaml '.os' 'config.yaml')
     CMD="$OS-chroot /mnt"
     timedatectl set-ntp true
     create_partitions
