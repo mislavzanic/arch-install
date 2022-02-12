@@ -117,7 +117,15 @@ enable_net() {
     esac
 }
 
-main() {
+add_hosts() {
+    cat <<EOT >> /mnt/etc/hosts
+127.0.0.127     localhost
+::1             localhost
+127.0.1.1       $HOSTNAME.localdomain   $HOSTNAME
+EOT
+}
+
+pre_base_install() {
     [ -f 'config.yaml' ] || { echo "Create config.yaml" && exit; }
     check_efi
     check_net
@@ -127,26 +135,34 @@ main() {
     timedatectl set-ntp true
     create_partitions
     format_disk
-    install_base
-    genfstab -U /mnt >> /mnt/etc/fstab
+}
+
+post_base_install() {
     set_localtime
     $CMD hwclock --systohc
     echo "$HOSTNAME" >> /mnt/etc/hostname
-cat <<EOT >> /mnt/etc/hosts
-127.0.0.127     localhost
-::1             localhost
-127.0.1.1       $HOSTNAME.localdomain   $HOSTNAME
-EOT
+    add_hosts
     echo "Enter system password..."
-    $CMD passwd 
+    $CMD passwd
     configure_user
     install_grub
     enable_net
+}
+
+finish() {
     echo "Base $OS installed :)"
     umount -l $DISK
     echo "Press enter when ready to reboot and remove boot usb!"
     read DISK
     reboot
+}
+
+main() {
+    pre_base_install
+    install_base
+    genfstab -U /mnt >> /mnt/etc/fstab
+    post_base_install
+    finish
 }
 
 main
