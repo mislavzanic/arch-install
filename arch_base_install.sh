@@ -1,21 +1,24 @@
 #!/bin/sh
+#
+#               _             _     ___           _        _ _
+#              / \   _ __ ___| |__ |_ _|_ __  ___| |_ __ _| | | ___ _ __
+#             / _ \ | '__/ __| '_ \ | || '_ \/ __| __/ _` | | |/ _ \ '__|
+#            / ___ \| | | (__| | | || || | | \__ \ || (_| | | |  __/ |
+#           /_/   \_\_|  \___|_| |_|___|_| |_|___/\__\__,_|_|_|\___|_|
 
 IS_EFI=''
-DEVICE=''
+DISK=''
 ROOT=''
 BOOT=''
 SWAP=''
 REGION=''
 CITY=''
 OS=''
-DOAS='1'
 CMD=''
 
-choose_os() {
-    PS3='Choose your base system:'
-    select OS in arch artix-openrc artix-runit; do
-        break
-    done
+parse_yaml() {
+    result=($(yq "$1" "$2" | sed 's/\"//g' | tr '\n' ' '))
+    echo "${result[@]}"
 }
 
 check_efi() {
@@ -30,58 +33,28 @@ check_net() {
 get_device() {
     lsblk
     PS3='Choose device for installation:'
-    select DEVICE in $(lsblk -dpnoNAME); do
+    select DISK in $(lsblk -dpnoNAME); do
         break
     done
-    [ -z $DEVICE ] && DEVICE='/dev/sda' 
+    [ -z $DISK ] && DISK='/dev/sda'
 }
 
 create_partitions() {
     get_device
-    wipefs -a $DEVICE
-    sfdisk --delete $DEVICE
-    echo 'Swap size (K, M, G...):'
-    read swap
-    if [ $IS_EFI -eq '1' ]; then
-        echo 'Boot partition size (K, M, G...):'
-        read boot
-fdisk $DEVICE <<EOF
-g
-n
+    DISK=$(parse_yaml '.disk' 'config.yaml')
+    sgdisk -Z ${DISK}
+    sgdisk -a 2048 -o ${DISK}
 
-
-+550M
-n
-
-
-+$swap
-n
-
-
-
-t
-1
-1
-t
-2
-19
-w
-EOF
-    else
-        echo 'LEGACY BOOT not supported yet...'
-    fi
+    sgdisk -n 1::+550M --typecode=2:ef00 --change-name=2:'EFI' ${DISK}
+    sgdisk -n 2::+2GiB --typecode=0:8200 --change-name=0:'SWAP' ${DISK}
+    sgdisk -n 3::-0 --typecode=3:8300 --change-name=3:'ROOT' ${DISK}
 }
 
 format_disk() {
-    parts=($(lsblk -lnpoNAME,TYPE | grep $DEVICE | grep "part" | awk '{print $1}'))
-    if [ $IS_EFI -eq '1' ]; then
-        BOOT="${parts[0]}"
-        SWAP="${parts[1]}"
-        ROOT="${parts[2]}"
-    else
-        SWAP="${parts[0]}"
-        ROOT="${parts[1]}"
-    fi
+    parts=($(lsblk -lnpoNAME,TYPE | grep $DISK | grep "part" | awk '{print $1}'))
+    BOOT="${parts[0]}"
+    SWAP="${parts[1]}"
+    ROOT="${parts[2]}"
     mkfs.ext4 $ROOT
     mkswap $SWAP
     [ $IS_EFI -eq '1' ] && mkfs.fat -F32 $BOOT
@@ -90,45 +63,14 @@ format_disk() {
 }
 
 install_base() {
-    packages='base linux linux-firmware base-devel vim git yq'
-    [ $DOAS -eq '1' ] && packages="$packages doas"
     cmd=''
-    case $OS in
-        'arch')
-            cmd='pacstrap /mnt'
-            ;;
-        'artix-openrc')
-            cmd='basestrap /mnt'
-            packages="$packages openrc elogind-openrc"
-            ;;
-        'artix-runit')
-            cmd='basestrap /mnt'
-            packages="$packages runit elogind-runit"
-            ;;
-        *)
-            echo "$OS install not supported yet.. aborting.." && exit
-            ;;
-    esac
+    packages=$(parse_yaml '.packages.base[]' 'config.yaml')
+    [ $os == 'arch' ] && cmd='pacstrap /mnt' || {
+        cmd='basestrap /mnt'
+        initsys=$(parse_yaml '.init_system' 'config.yaml')
+        packages="$packages $initsys elogind-$initsys"
+    }
     $cmd $packages
-}
-
-change_root() {
-    CMD=''
-    case $OS in
-        'arch')
-            CMD='arch-chroot'
-            ;;
-        'artix-openrc')
-            CMD='artix-chroot'
-            ;;
-        'artix-runit')
-            CMD='artix-chroot'
-            ;;
-        *)
-            echo "$OS install not supported yet.. aborting.." && exit
-            ;;
-    esac
-    CMD="$CMD /mnt"
 }
 
 gen_locale() {
@@ -137,27 +79,22 @@ gen_locale() {
 }
 
 install_grub() {
-    $CMD pacman -S grub dosfstools os-prober mtools
-    if [ $IS_EFI -eq "1" ]; then
-        $CMD pacman -S efibootmgr 
-        mkdir /mnt/boot/EFI
-        mount $BOOT /mnt/boot/EFI
-        $CMD grub-install --target=x86_64-efi --bootloader-id=grub_uefi --recheck
-        $CMD grub-mkconfig -o /boot/grub/grub.cfg
-    else
-        echo 'LEGACY BOOT not supported yet...'
-    fi
+    mkdir /mnt/boot/EFI
+    mount $BOOT /mnt/boot/EFI
+    $CMD grub-install --target=x86_64-efi --bootloader-id=grub_uefi --recheck
+    $CMD grub-mkconfig -o /boot/grub/grub.cfg
 }
 
 
 configure_user() {
-    echo "Enter username..."
-    read USER
+    USER=$(parse_yaml '.users | keys' 'config.yaml')
+    groups=$(parse_yaml ".users.$USER[]" 'config.yaml' | tr ' ' ',')
     $CMD useradd -m $USER
+    echo 'Enter user password...  '
     $CMD passwd $USER
-    $CMD usermod -aG wheel,audio,video,storage $USER
+    $CMD usermod -aG "$groups" $USER
     sed -i '/wheel ALL=(ALL) ALL/s/^#//g' /mnt/etc/sudoers
-    [ $DOAS -eq '1' ] && touch /mnt/etc/doas.conf && echo "permit :wheel\n permit nopass :wheel as root cmd /usr/bin/tee" | tee /mnt/etc/doas.conf
+    touch /mnt/etc/doas.conf && echo "permit :wheel" | tee /mnt/etc/doas.conf
 }
 
 set_localtime() {
@@ -175,16 +112,15 @@ set_localtime() {
 }
 
 enable_net() {
-    $CMD pacman -Syyu
-    $CMD pacman -S networkmanager
-    case $OS in 
-        'arch')
+    initsys=$(parse_yaml '.init_system' 'config.yaml')
+    case $initsys in
+        'systemd')
             $CMD systemctl enable NetworkManager
             ;;
-        'artix-openrc')
+        'openrc')
             $CMD rc-update add NetworkManager
             ;;
-        'artix-runit')
+        'runit')
             $CMD ln -s /etc/runit/sv/NetworkManager /run/runit/service
             ;;
         *)
@@ -193,15 +129,17 @@ enable_net() {
 }
 
 main() {
-    choose_os
+    [ -f 'config.yaml' ] || { echo "Create config.yaml" && exit; }
     check_efi
     check_net
+    pacman -S yq
+    OS=$(parse_yaml 'os' 'config.yaml')
+    CMD="$OS-chroot /mnt"
     timedatectl set-ntp true
     create_partitions
     format_disk
     install_base
     genfstab -U /mnt >> /mnt/etc/fstab
-    change_root
     set_localtime
     $CMD hwclock --systohc
     echo "$HOSTNAME" >> /mnt/etc/hostname
@@ -216,9 +154,9 @@ EOT
     install_grub
     enable_net
     echo "Base $OS installed :)"
-    umount -l $DEVICE
+    umount -l $DISK
     echo "Press enter when ready to reboot and remove boot usb!"
-    read DEVICE
+    read DISK
     reboot
 }
 

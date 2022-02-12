@@ -1,0 +1,34 @@
+os: # arch or artix
+init_system: # systemd if arch else openrc or runit
+hostname: # hostname
+disk: # device name of disk on which os is going to be installed
+
+users:
+  # key: [ vals ]
+  # key == username
+  # vals == groups
+  # eg.
+  # mislav:
+  #   - wheel
+  #   - audio
+  #   - video
+  #   - storage
+  #   - transmission
+
+# packages for installation
+packages:
+  base:
+    - base
+    - linux
+    - linux-firmware
+    - base-devel
+    - vim
+    - git
+    - yq
+    - grub
+    - dosfstools
+    - os-prober
+    - mtools
+    - efibootmgr
+    - networkmanager
+    - doas

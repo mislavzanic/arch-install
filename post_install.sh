@@ -8,7 +8,7 @@ parse_yaml() {
 }
 
 get_aur_helper() {
-    AUR_HELPER=$(parse_yaml '.aur_helper' 'config.yaml')[0]
+    AUR_HELPER=$(parse_yaml '.aur_helper' 'config.yaml')
     [ $(pacman -Q | grep $AUR_HELPER | wc -l) -gt '0' ] || {
         git clone https://aur.archlinux.org/$AUR_HELPER.git
         cd $AUR_HELPER
@@ -17,14 +17,13 @@ get_aur_helper() {
     }
 }
 
-
 dwd_packages() {
-    packages=$(yq ".$1[]" packages.yaml | sed 's/\"//g' | tr '\n' ' ')
+    packages=$(parse_yaml ".$1[]" "packages.yaml")
     [ "$1" -eq "pacman" ] && sudo pacman -S $packages || $AUR_HELPER -S $packages
 }
 
 config_dots() {
-    dot_repo=$(parse_yaml '.dotfiles[]' 'config.yaml')[0]
+    dot_repo=$(parse_yaml '.git_repos.dotfiles.https' 'config.yaml')
     git clone --recurse-submodules "$dot_repo" $HOME/dotfiles
     chmod a+x $HOME/dotfiles/install.sh
     $HOME/dotfiles/install.sh
@@ -48,11 +47,10 @@ EOF
 install_packages() {
     dwd_packages "packages.pacman"
     dwd_packages "packages.aur"
-    config_dots
 }
 
 create_dirs() {
-    dirs=($(yq ".dirs[]" | sed 's/\"//g' | tr '\n' ' '))
+    dirs=$(parse_yaml '.dirs[]' 'config.yaml')
     for dir in "${dirs[@]}"; do
         mkdir -p $dir
     done
@@ -65,12 +63,14 @@ cronjobs() {
 }
 
 main() {
-    [ -f "config.yaml" ] || curl -fLO "https://raw.githubusercontent.com/mislavzanic/arch_install/master/config.yaml"
+    [ -f "config.yaml" ] || curl -fLO "https://raw.githubusercontent.com/mislavzanic/dotfiles/master/.config/config.yaml"
     get_aur_helper
     create_dirs
-    install_packages "$1"
+    install_packages
+    config_dots
     chsh -s $(which zsh)
     cronjobs
+    rm -rf config.yaml
     # nvim --headless +PlugInstall +qall
 }
 

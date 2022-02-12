@@ -1,78 +1,10 @@
-aur_helper: paru
+disk: /dev/nvme0n1
+hostname: archAMD
 
-wm: xmonad
-
-dotfiles:
-  - https://github.com/mislavzanic/dotfiles.git
-
-dirs:
-  - .config
-  - .local/bin
-  - .local/share
-
-packages:
-  pacman:
-    - alacritty
-    - clang
-    - cmake
-    - cronie
-    - discord
-    - dunst
-    - emacs
-    - exa
-    - base-devel
-    - feh
-    - fzf
-    - htop
-    - libnotify
-    - ttf-symbolia
-    - libinput
-    - lxappearance
-    - maim
-    - man-db
-    - mpv
-    - neofetch
-    - neovim
-    - network-manager-applet
-    - noto-fonts-emoji
-    - npm
-    - ntfs-3g
-    - pamixer
-    - pass
-    - pavucontrol
-    - pulseaudio-alsa
-    - starship
-    - sxiv
-    - thunar
-    - transmission-cli
-    - ttf-font-awesome
-    - ttf-iosevka-nerd
-    - ttf-jetbrains-mono
-    - ttf-joypixels
-    - ttf-liberation
-    - ttf-nerd-fonts-symbols
-    - ttf-symbola
-    - ttf-ubuntu-font-family
-    - unzip
-    - virt-manager
-    - xorg-server
-    - xorg-xinit
-    - xorg-xprop
-    - xclip
-    - xdotool
-    - xcompmgr
-    - youtube-dl
-    - zip
-    - zathura
-    - zathura-pdf-mupdf
-    - zsh-autosuggestions
-    - zsh
-    - zsh-syntax-highlighting
-
-  aur:
-    - brave-bin
-    - gtk-theme-arc-gruvbox-git
-    - libxft-bgra-git
-    - spotify
-    - stack-static
-    - tremc
+users:
+  mislav:
+    - wheel
+    - audio
+    - video
+    - storage
+    - transmission
